@@ -1,0 +1,3 @@
+- [jtea 学习笔记](https://github.com/jmilktea/jtea)
+- [RocketMQ](https://wuchanming.gitbooks.io/rocketmq/content/chapter1.html)
+- [设计数据密集型应用](https://github.com/Vonng/ddia)
