@@ -1214,19 +1214,19 @@ JVM实现者可以通过`System.gc()`调用来决定JVM的GC行为。而一般�
 
 1)-XX:NewSize和-XX:MaxNewSize
 
-​      用于设置年轻代的大小，建议设为整个堆大小的1/3或者1/4,两个值设为一样大。
+用于设置年轻代的大小，建议设为整个堆大小的1/3或者1/4,两个值设为一样大。
 
 2)-XX:SurvivorRatio
 
-​      用于设置Eden和其中一个Survivor的比值，这个值也比较重要。
+用于设置Eden和其中一个Survivor的比值，这个值也比较重要。
 
 3)-XX:+PrintTenuringDistribution
 
-​      这个参数用于显示每次Minor GC时Survivor区中各个年龄段的对象的大小。
+这个参数用于显示每次Minor GC时Survivor区中各个年龄段的对象的大小。
 
 4).-XX:InitialTenuringThreshol和-XX:MaxTenuringThreshold
 
-​      用于设置晋升到老年代的对象年龄的最小值和最大值，每个对象在坚持过一次Minor GC之后，年龄就加1。
+用于设置晋升到老年代的对象年龄的最小值和最大值，每个对象在坚持过一次Minor GC之后，年龄就加1。
 
 
 
@@ -1259,14 +1259,14 @@ JVM实现者可以通过`System.gc()`调用来决定JVM的GC行为。而一般�
 
 #### Parallel Scavenge
 
-| 命令                        | 作用                                                         |
-| --------------------------- | ------------------------------------------------------------ |
-| -XX: +UseParallelGC         | 指定年轻代使用Parallel并行收集器执行内存回收任务。           |
-| -XX: +UseParallelOldGC      | 指定老年代都是使用并行回收收集器。UseParallelGC和UseParallelOldGC默认开启一个，另一个也会被开启。 |
-| -XX: ParallelGCThreads      | 设置年轻代并行收集器的线程数。一般地，最好与CPU数量相等，以避免过多的线程数影响垃圾收集性能。在默认情况下，当CPU数量小于8个， ParallelGCThreads的值等于CPU数量。当CPU数量大于8个， ParallelGCThreads的值等于3+ [5*CPU_ Count]/8]。 |
-| -XX:MaxGdPauseMillis        | 设置垃圾收集器最大停顿时间(即STW的时间)，单位是毫秒。为了尽可能地把停顿时间控制在MaxGCPauseMills以内，收集器在工作时会调整Java堆大小或者其他一些参数。对于用户来讲，停顿时间越短体验越好。但是在服务器端，我们注重高并发，整体的吞吐量。所以服务器端适合Parallel，进行控制。该参数使用需谨慎。 |
-| -XX:GCTimeRatio             | 垃圾收集时间占总时间的比例(=1/(N+1))，用于衡量吞吐量的大小。取值范围(0, 100)。默认值99，也就是垃圾回收时间不超过1%。与前一个-XX:MaxGCPauseMillis参数有一定矛盾性。暂停时间越长，Radio参数就容易超过设定的比例。 |
-| -XX: +UseAdaptiveSizePolicy | 设置Parallel Scavenge收集器具有**自适应调节策略**，在这种模式下，年轻代的大小、Eden和Survivor的比例、晋升老年代的对象年龄等参数会被自动调整，已达到在堆大小、吞吐量和停顿时间之间的平衡点。在手动调优比较困难的场合，可以直接使用这种自适应的方式，仅指定虚拟机的最大堆、目标的吞吐量(GCT imeRatio)和停顿时间(MaxGCPauseMills)，让虚拟机自己完成调优工作。 |
+| 命令                       | 作用                                                         |
+| -------------------------- | ------------------------------------------------------------ |
+| -XX: +UseParallelGC        | 指定年轻代使用Parallel并行收集器执行内存回收任务。           |
+| -XX: +UseParallelOldGC     | 指定老年代都是使用并行回收收集器。UseParallelGC和UseParallelOldGC默认开启一个，另一个也会被开启。 |
+| -XX: ParallelGCThreads     | 设置年轻代并行收集器的线程数。一般地，最好与CPU数量相等，以避免过多的线程数影响垃圾收集性能。在默认情况下，当CPU数量小于8个， ParallelGCThreads的值等于CPU数量。当CPU数量大于8个， ParallelGCThreads的值等于3+ [5*CPU_ Count]/8]。 |
+| -XX:MaxGdPauseMillis       | 设置垃圾收集器最大停顿时间(即STW的时间)，单位是毫秒。为了尽可能地把停顿时间控制在MaxGCPauseMills以内，收集器在工作时会调整Java堆大小或者其他一些参数。对于用户来讲，停顿时间越短体验越好。但是在服务器端，我们注重高并发，整体的吞吐量。所以服务器端适合Parallel，进行控制。该参数使用需谨慎。 |
+| -XX:GCTimeRatio            | 垃圾收集时间占总时间的比例(=1/(N+1))，用于衡量吞吐量的大小。取值范围(0, 100)。默认值99，也就是垃圾回收时间不超过1%。与前一个-XX:MaxGCPauseMillis参数有一定矛盾性。暂停时间越长，Radio参数就容易超过设定的比例。 |
+| -XX:+UseAdaptiveSizePolicy | 设置Parallel Scavenge收集器具有**自适应调节策略**，在这种模式下，年轻代的大小、Eden和Survivor的比例、晋升老年代的对象年龄等参数会被自动调整，已达到在堆大小、吞吐量和停顿时间之间的平衡点。在手动调优比较困难的场合，可以直接使用这种自适应的方式，仅指定虚拟机的最大堆、目标的吞吐量(GCT imeRatio)和停顿时间(MaxGCPauseMills)，让虚拟机自己完成调优工作。 |
 
 
 

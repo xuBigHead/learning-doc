@@ -1,3 +1,4 @@
+- [Google Java 编程规范（中文版）](https://jervyshi.gitbooks.io/google-java-styleguide-zh/content/introduction/index.html)
 - [jtea 学习笔记](https://github.com/jmilktea/jtea)
 - [RocketMQ](https://wuchanming.gitbooks.io/rocketmq/content/chapter1.html)
 - [设计数据密集型应用](https://github.com/Vonng/ddia)
