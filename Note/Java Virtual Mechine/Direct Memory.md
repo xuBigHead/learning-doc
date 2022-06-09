@@ -22,7 +22,6 @@ ByteBuffer byteBuffer = ByteBuffer.allocateDirect(BUFFER);
 ```
 
 
-
 ## 读取文件
 
 ### 使用IO读取文件
@@ -37,13 +36,85 @@ ByteBuffer byteBuffer = ByteBuffer.allocateDirect(BUFFER);
 
 ![飞书20220609-113319](../../Image/2022/220609-2.png)
 
+### 代码示例
+```java
+public class DirectMemoryBufferTest {
+    private static final int _100MB = 1024 * 1024 * 100;
 
+    @Test
+    public void compareCopyFile() {
+        String src = "D:\\Books\\重学Java设计模式.pdf";
+        for (int i = 0; i < 1; i++) {
+            String dest = src + i;
+            calculateSpendTime(this::copyByIO, src,  dest + "io" + i + ".pdf");
+            calculateSpendTime(this::copyByDirectBuffer, src, dest + "nio" + i + ".pdf");
+        }
+    }
+
+    private void calculateSpendTime(BiConsumer<String, String> consumer, String src, String dest) {
+        Stopwatch started = Stopwatch.createStarted();
+        consumer.accept(src, dest);
+        started.stop();
+        System.err.println(started.elapsed(TimeUnit.MILLISECONDS));
+    }
+
+    private void copyByDirectBuffer(String src, String dest) {
+        try (FileChannel inChannel = new FileInputStream(src).getChannel();
+             FileChannel outChannel = new FileOutputStream(dest).getChannel()) {
+            ByteBuffer byteBuffer = ByteBuffer.allocateDirect(_100MB);
+            while (inChannel.read(byteBuffer) != -1) {
+                byteBuffer.flip();  // 修改为读数据模式
+                outChannel.write(byteBuffer);
+                byteBuffer.clear(); // 清空
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void copyByIO(String src, String dest) {
+        try (FileInputStream fis = new FileInputStream(src);
+             FileOutputStream fos = new FileOutputStream(dest)) {
+            byte[] buffer = new byte[_100MB];
+            while (true) {
+                int len = fis.read(buffer);
+                if (len == -1) {
+                    break;
+                }
+                fos.write(buffer, 0, len);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
 
 ## 存在的问题
 - 可能导致OutOfMemoryError异常；
 - 由于直接内存在Java堆外，因此它的大小不会直接受限于-Xmx指定的最大堆大小，但是系统内存是有限的，Java堆和直接内存的总和依然受限于操作系统能给出的最大内存；
 - 分配回收成本较高，不受JVM内存回收管理。
   
+### 代码示例
+```java
+public class DirectMemoryBufferTest {
+    private static final int BUFFER = 1024 * 1024 * 40; // 20MB
+    @Test
+    public void directMemoryOutOfMemory() {
+        List<ByteBuffer> byteBuffers = new ArrayList<>();
+        int count = 0;
+        try {
+            while (true) {
+                ByteBuffer byteBuffer = ByteBuffer.allocateDirect(BUFFER);
+                byteBuffers.add(byteBuffer);
+                count++;
+            }
+        } finally {
+            System.out.println(count);
+        }
+    }
+}
+```
 
 
 
