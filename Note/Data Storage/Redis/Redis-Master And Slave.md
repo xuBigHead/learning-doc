@@ -22,7 +22,7 @@
 
 ### 哨兵的架构模式
 
-<img src="../../../Image/2022/20220425.jpg" alt="640" style="zoom: 67%;" />
+<img src="../../../Image/2022/220425.jpg" alt="640" style="zoom: 67%;" />
 
 
 

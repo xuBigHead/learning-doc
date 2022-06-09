@@ -275,7 +275,7 @@ MySQL 是一款安全、跨平台、高效的，并与PHP、Java 等主流编程
 
 ### SpringBoot
 - [SpringBoot Run.md](Note/SpringBoot/SpringBoot%20Run.md)
-- [Temp.md](Note/Temp.md)
+- [Temp.md](Temp.md)
 
 ### Third Party Library
 
