@@ -85,7 +85,7 @@ MySQL 是一款安全、跨平台、高效的，并与PHP、Java 等主流编程
 - [Redis.md](Note/Data%20Storage/Redis/Redis.md)
 
 ### Data Structure
-- [Tree.md](Note/Data%20Structure/Tree.md)
+- [Tree.md](Note/Data_Structure/Tree.md)
 
 ### Distributed
 - [Distribute Lock.md](Note/Distributed/Distribute%20Lock.md)
@@ -207,7 +207,7 @@ MySQL 是一款安全、跨平台、高效的，并与PHP、Java 等主流编程
 - [Java_Collection_Set.md](Note/Java/Java%20Base/Java_Collection_Set.md)
 
 ### Java Class
-- [ThreadLocal.md](Note/Java%20Class/ThreadLocal.md)
+- [ThreadLocal.md](Note/Java_Class/ThreadLocal.md)
 
 ### Java Virtual Mechine
 - [Direct Memory.md](Note/Java%20Virtual%20Mechine/Direct%20Memory.md)
@@ -217,7 +217,7 @@ MySQL 是一款安全、跨平台、高效的，并与PHP、Java 等主流编程
 - [JVM Memory.md](Note/Java%20Virtual%20Mechine/JVM%20Memory.md)
 - [JVM Object Instantiation.md](Note/Java%20Virtual%20Mechine/JVM%20Object%20Instantiation.md)
 - [JVM Optimize.md](Note/Java%20Virtual%20Mechine/JVM%20Optimize.md)
-- [JVM.md](Note/Java%20Virtual%20Mechine/JVM.md)
+- [JVM.md](Note/Java_Virtual_Mechine/JVM.md)
 
 ### Linux
 - [Linux Memory.md](Note/Linux/Linux%20Memory.md)
