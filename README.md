@@ -2,7 +2,7 @@
 ## Introduction
 当前工程属于mangmang.xu的个人学习工程
 
-## 0Note
+## Note
 
 ### Algorithm
 算法相关的笔记
@@ -36,6 +36,8 @@
 - [Design Pattern20-Observer Pattern.md](Note/Coding/Design%20Pattern/Design%20Pattern20-Observer%20Pattern.md)
 - [Design Pattern21-State Pattern.md](Note/Coding/Design%20Pattern/Design%20Pattern21-State%20Pattern.md)
 - [Design Pattern22-Strategy Pattern.md](Note/Coding/Design%20Pattern/Design%20Pattern22-Strategy%20Pattern.md)
+
+#### Design_Pattern
 - [Program Standard.md](Note/Coding/Program%20Standard.md)
 
 ### Concurrent
@@ -84,7 +86,17 @@ MySQL 是一款安全、跨平台、高效的，并与PHP、Java 等主流编程
 - [Redis-Production Example.md](Note/Data%20Storage/Redis/Redis-Production%20Example.md)
 - [Redis.md](Note/Data%20Storage/Redis/Redis.md)
 
-### Data Structure
+### Data_Storage
+
+#### MongoDB
+
+#### MySQL
+MySQL 是一款安全、跨平台、高效的，并与PHP、Java 等主流编程语言紧密结合的数据库系统。 该数据库系统是由瑞典的MySQL AB 公司开发、发布并支持，由MySQL 的初始开发人员David Axmark 和Michael Monty Widenius 于1995 年建立的。
+
+
+#### Redis
+
+### Data_Structure
 - [Tree.md](Note/Data_Structure/Tree.md)
 
 ### Distributed
@@ -114,6 +126,18 @@ MySQL 是一款安全、跨平台、高效的，并与PHP、Java 等主流编程
 
 #### System Monitor
 - [Sentinal.md](Note/Distributed%20Component/System%20Monitor/Sentinal.md)
+
+### Distributed_Component
+
+#### Link Tracking
+
+#### Load Balancer
+
+#### Micro Service
+
+#### Remote Procedure Call
+
+#### System Monitor
 
 ### Doc Note
 - [Algorithm.docx](Note/Doc%20Note/Algorithm.docx)
@@ -150,8 +174,12 @@ MySQL 是一款安全、跨平台、高效的，并与PHP、Java 等主流编程
 - [Template.docx](Note/Doc%20Note/Template.docx)
 - [Vue.docx](Note/Doc%20Note/Vue.docx)
 
+### Doc_Note
+
 ### Front-end Technology
 - [Vue.md](Note/Front-end%20Technology/Vue.md)
+
+### Front-end_Technology
 
 ### Information Technology
 - [Arthas.md](Note/Information%20Technology/Arthas.md)
@@ -174,6 +202,16 @@ MySQL 是一款安全、跨平台、高效的，并与PHP、Java 等主流编程
 - [Git.md](Note/Information%20Technology/Others/Git.md)
 - [JSON.md](Note/Information%20Technology/Others/JSON.md)
 - [系统架构.md](Note/Information%20Technology/Others/系统架构.md)
+
+### Information_Technology
+
+#### Building
+
+#### Container Deploy
+
+#### Operate System
+
+#### Others
 
 ### Java
 
@@ -206,18 +244,23 @@ MySQL 是一款安全、跨平台、高效的，并与PHP、Java 等主流编程
 - [Java_Collection_Map.md](Note/Java/Java%20Base/Java_Collection_Map.md)
 - [Java_Collection_Set.md](Note/Java/Java%20Base/Java_Collection_Set.md)
 
-### Java Class
+#### Java_8
+
+#### Java_Base
+
+### Java_Class
+- [String.md](Note/Java_Class/String.md)
 - [ThreadLocal.md](Note/Java_Class/ThreadLocal.md)
 
-### Java Virtual Mechine
-- [Direct Memory.md](Note/Java%20Virtual%20Mechine/Direct%20Memory.md)
-- [JVM Classloader.md](Note/Java%20Virtual%20Mechine/JVM%20Classloader.md)
-- [JVM Execution Engine.md](Note/Java%20Virtual%20Mechine/JVM%20Execution%20Engine.md)
-- [JVM Garbage Collect.md](Note/Java%20Virtual%20Mechine/JVM%20Garbage%20Collect.md)
-- [JVM Memory.md](Note/Java%20Virtual%20Mechine/JVM%20Memory.md)
-- [JVM Object Instantiation.md](Note/Java%20Virtual%20Mechine/JVM%20Object%20Instantiation.md)
-- [JVM Optimize.md](Note/Java%20Virtual%20Mechine/JVM%20Optimize.md)
+### Java_Virtual_Mechine
+- [Direct Memory.md](Note/Java_Virtual_Mechine/Direct%20Memory.md)
+- [JVM Classloader.md](Note/Java_Virtual_Mechine/JVM%20Classloader.md)
+- [JVM Garbage Collect.md](Note/Java_Virtual_Mechine/JVM%20Garbage%20Collect.md)
+- [JVM Memory.md](Note/Java_Virtual_Mechine/JVM%20Memory.md)
+- [JVM Object Instantiation.md](Note/Java_Virtual_Mechine/JVM%20Object%20Instantiation.md)
+- [JVM Optimize.md](Note/Java_Virtual_Mechine/JVM%20Optimize.md)
 - [JVM.md](Note/Java_Virtual_Mechine/JVM.md)
+- [JVM_Execution_Engine.md](Note/Java_Virtual_Mechine/JVM_Execution_Engine.md)
 
 ### Linux
 - [Linux Memory.md](Note/Linux/Linux%20Memory.md)
@@ -275,7 +318,6 @@ MySQL 是一款安全、跨平台、高效的，并与PHP、Java 等主流编程
 
 ### SpringBoot
 - [SpringBoot Run.md](Note/SpringBoot/SpringBoot%20Run.md)
-- [Temp.md](Temp.md)
 
 ### Third Party Library
 
@@ -295,4 +337,4 @@ MySQL 是一款安全、跨平台、高效的，并与PHP、Java 等主流编程
 - [Jackson.md](Note/Third%20Party%20Library/Others/Jackson.md)
 - [Okhttp.md](Note/Third%20Party%20Library/Others/Okhttp.md)
 
-============ 最新更新时间：2022年06月08日14时43分49秒 ============
+============ 最新更新时间：2022年06月14日18时27分05秒 ============
