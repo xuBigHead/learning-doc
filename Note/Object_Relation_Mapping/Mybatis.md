@@ -6,7 +6,7 @@
 - 获取连接Connection
 - 预编译SQL 
 # 原理
-![1](../../Image/2021/210520-1.png)
+![1](../../Image/2021/05/210520-1.png)
 
 - 首先通过SqlSessionFactoryBuilder的build方法构建SqlSessionFactory接口的实现类DefaultSqlSessionFactory对象；
 - 然后通过SqlSessionFactory的openSession方法构建SqlSession接口的实现类DefaultSqlSession对象；
@@ -470,7 +470,7 @@ Mybatis缓存相关类位于`org.apache.ibatis.cache`目录下，缓存的key功
 
 一级缓存的有效期是一次会话过程，会话关闭，一级缓存也就失效。另外，如果会话中发生了增删改的写操作，一级缓存的会话同样会失效。
 
-![1](../../Image/2021/210526-1.png)
+![1](../../Image/2021/05/210526-1.png)
 
 ### 一级缓存配置
 通过mybatis-config.xml配置开启一级缓存，`localCacheScope`配置的可选值有`SESSION`和`STATEMENT`两个级别。
@@ -691,7 +691,7 @@ public abstract class BaseExecutor implements Executor {
 - 因为所有的增删改都会刷新二级缓存，导致二级缓存失效，所以适合在查询为主的应用中使用，比如历史交易、历史订单的查询。否则缓存就失去了意义。
 - 如果多个namespace 中有针对于同一个表的操作，比如Blog 表，如果在一个namespace 中刷新了缓存，另一个namespace 中没有刷新，就会出现读到脏数据的情况。所以，推荐在一个Mapper 里面只操作单表的情况使用。
 
-![1](../../Image/2021/210526-2.png)
+![1](../../Image/2021/05/210526-2.png)
 
 ### 二级缓存配置
 #### XML配置方式
