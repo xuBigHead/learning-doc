@@ -1,1 +1,2 @@
 <ruby style="font-size:2rem;">雷神<rt>なるかみ</rt></ruby>
+
