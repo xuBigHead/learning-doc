@@ -1,33 +1,6 @@
-# Table Of Contents
-[TOC]
-
-
-# 字符串
-## String
-### 属性
-### 方法
-### 扩展
-#### String类占用内存空间
-
-## StringBuilder
-
-## StringBuffer
-
-# 日期
-## Date
-## Instant
-## LocalDate
-## LocalDateTime
-
-# 数学
-## Integer
-## Long
-## Boolean
-
-# 其他
-## Optional
+# Optional
 > @since Java8
-    
+
 从Java8开始提供的Optional容器类，用于尽量避免空指针异常。
 
 > java.util.Optional
@@ -45,7 +18,7 @@ public final class Optional<T> {
 }
 ```
 
-### Optional创建
+## Optional创建
 > java.util.Optional.Optional()
 ```java
     private Optional() {
@@ -81,8 +54,8 @@ public final class Optional<T> {
     }
 ```
 
-### Optional方法
-#### get
+## Optional方法
+## get
 获取封装对象，如果为null则抛出异常
 
 > java.util.Optional.get
@@ -96,7 +69,7 @@ public final class Optional<T> {
     }
 ```
 
-#### isPresent
+## isPresent
 判断封装对象是否为null
 
 > java.util.Optional.isPresent

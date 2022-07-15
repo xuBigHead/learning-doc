@@ -1,6 +1,144 @@
-## StringTable
+# String
 
-### String的基本特性
+String 类中使用 final 关键字修饰字符数组来保存字符串，所以 String 对象是不可变的。
+
+
+
+> java.lang.String
+
+```java
+public final class String
+    implements java.io.Serializable, Comparable<String>, CharSequence {
+    /** The value is used for character storage. */
+    private final char value[];
+}
+```
+
+
+
+> 在 Java 9 之后，String的实现改用 byte 数组存储字符串。
+
+
+
+## 创建String对象
+
+当创建 String 类型的对象时，虚拟机会在常量池中查找有没有已经存在的值和要创建的值相同的对象，如果有就把它赋给当前引用。如果没有就在常量池中重新创建一个 String 对象。
+
+
+
+## equals方法
+
+String 中的 equals 方法是被重写过的，因为 object 的 equals 方法是比较的对象的内存地址，而 String 的 equals 方法比较的是对象的值。
+
+
+
+> java.lang.String
+
+```java
+public boolean equals(Object anObject) {
+    if (this == anObject) {
+        return true;
+    }
+    if (anObject instanceof String) {
+        String anotherString = (String)anObject;
+        int n = value.length;
+        if (n == anotherString.value.length) {
+            char v1[] = value;
+            char v2[] = anotherString.value;
+            int i = 0;
+            while (n-- != 0) {
+                if (v1[i] != v2[i])
+                    return false;
+                i++;
+            }
+            return true;
+        }
+    }
+    return false;
+}
+```
+
+
+
+# StringBuilder和StringBuffer
+
+而 StringBuilder 与 StringBuffer 都继承自 AbstractStringBuilder 类，在 AbstractStringBuilder 中也是使用字符数组保存字符串char[]value 但是没有用 final 关键字修饰，所以这两种对象都是可变的。
+
+StringBuilder 与 StringBuffer 的构造方法都是调用父类构造方法也就是 AbstractStringBuilder 实现的。
+
+
+
+> java.lang.StringBuilder
+
+```java
+public final class StringBuilder
+    extends AbstractStringBuilder
+    implements java.io.Serializable, CharSequence
+{
+}
+```
+
+
+
+> java.lang.StringBuffer
+
+```java
+public final class StringBuffer
+    extends AbstractStringBuilder
+    implements java.io.Serializable, CharSequence
+{
+}
+```
+
+
+
+>java.lang.AbstractStringBuilder
+
+```java
+abstract class AbstractStringBuilder implements Appendable, CharSequence {
+    /**
+     * The value is used for character storage.
+     */
+    char[] value;
+
+    /**
+     * The count is the number of characters used.
+     */
+    int count;
+}
+```
+
+
+
+> 在 Java 9 之后，StringBuilder` 与 `StringBuffer的实现改用 byte 数组存储字符串。
+
+
+
+## String、StringBuilder和StringBuffer
+
+## **线程安全性**
+
+String 中的对象是不可变的，也就可以理解为常量，线程安全。AbstractStringBuilder 是 StringBuilder 与 StringBuffer 的公共父类，定义了一些字符串的基本操作，如 expandCapacity、append、insert、indexOf 等公共方法。StringBuffer 对方法加了同步锁或者对调用的方法加了同步锁，所以是线程安全的。StringBuilder 并没有对方法进行加同步锁，所以是非线程安全的。
+
+
+
+## 性能
+
+每次对 String 类型进行改变的时候，都会生成一个新的 String 对象，然后将指针指向新的 String 对象。StringBuffer 每次都会对 StringBuffer 对象本身进行操作，而不是生成新的对象并改变对象引用。相同情况下使用 StringBuilder 相比使用 StringBuffer 仅能获得 10%~15% 左右的性能提升，但却要冒多线程不安全的风险。
+
+
+
+## 总结
+
+1. 操作少量的数据: 适用 String
+2. 单线程操作字符串缓冲区下操作大量数据: 适用 StringBuilder
+3. 多线程操作字符串缓冲区下操作大量数据: 适用 StringBuffer
+
+
+
+# StringTable
+
+## String的基本特性
 
 - String: 字符串，使用一对""引起来表示
 - String声明为final的，**不可被继承**
@@ -18,7 +156,7 @@
     - 在jdk6中StringTable是固定的，就是1009的长度，所以如果常量池中的字符串过多就会导致效率下降很快。StringTableSize设置没有要求
     - 在jdk7中，StringTable的长度默认值是60013，1009是可设置的最小值。
 
-### String的内存分配
+## String的内存分配
 
 - 在Java语言中有8种基本数据类型和一种比较特殊的类型string。这些类型为了使它们在运行过程中速度更快、更节省内存，都提供了一种常量池的概念。
 - 常量池就类似一个Java系统级别提供的缓存。8种基本数据类型的常量池都是系统协调的，String类型的常量池比较特殊。它的主要使用方法有两种。
@@ -37,7 +175,7 @@
 1. permSize默认比较小
 2. 永久代垃圾回收频率低
 
-### 字符串的拼接操作
+## 字符串的拼接操作
 
 1. 常量与常量的拼接结果在常量池，原理是编译期优化
 2. 常量池中不会存在相同内容的常量。
@@ -63,7 +201,7 @@ public void test4(){
 
 
 
-### intern()的使用
+## intern()的使用
 
 如果不是用双引号声明的String对象，可以使用String提供的intern方法: intern方法会从字符串常量池中查询当前字符串是否存在，若不存在就会将当前字符串放入常量池中。
 
@@ -149,7 +287,7 @@ for (int i = 0; i < 10000; i++) {
 
 
 
-### G1的String去重操作
+## G1的String去重操作
 
 **背景**:对许多Java应用(有大的也有小的)做的测试得出以下结果:
 

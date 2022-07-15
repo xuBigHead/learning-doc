@@ -53,8 +53,8 @@
 - [ ] [] []()
 - [ ] [] []()
 - [ ] [] []()
-- [ ] [] []()
-- [ ] [] []()
+- [X] [2星A_2022_07_14] [Java hashCode() 和 equals()的若干问题解答](https://www.cnblogs.com/skywang12345/p/3324958.html)
+- [X] [2星A_2022_07_14] [深入剖析Java中的装箱和拆箱 ](https://www.cnblogs.com/dolphin0520/p/3780005.html)
 - [ ] [2星A_2022_07_11] [算法 - 排序.md](https://github.com/CyC2018/CS-Notes/blob/master/notes/%E7%AE%97%E6%B3%95%20-%20%E6%8E%92%E5%BA%8F.md)
 
 # 6月 79篇

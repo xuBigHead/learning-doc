@@ -6,9 +6,11 @@
 
 ![20220519](../../Image/2022/05/220519.png)
 
-### JVM
+### JVM、JRE和JDK
 
-Java虚拟机（Java Virtual Machine）是Java程序的运行环境（Java二进制字节码的运行环境）。
+#### JVM
+
+Java 虚拟机（Java Virtual Machine）是运行 Java 字节码的虚拟机。JVM 有针对不同系统的特定实现（Windows，Linux，macOS），目的是使用相同的字节码，它们都会给出相同的结果。
 
 Java虚拟机与Java语言并没有必然的联系，它只与特定的二进制文件格式——Class文件（字节码文件）格式所关联，Class 文件中包含了Java虚拟机指令集（或者称为字节码、Bytecodes）和符号表，还有一些其他辅助信息。Scala和Kotlin等语言编译成字节码文件后也能在JVM上运行。
 
@@ -20,13 +22,37 @@ Java 是跨平台的，JVM 不是跨平台的。
 
 
 
-### JRE
+**什么是字节码?采用字节码的好处是什么?**
 
-JRE（java runtime environment）是 java 运行时环境，包含了 JVM 和 java 核心基础类库（JDBC，lang and util）。
+> 在 Java 中，JVM 可以理解的代码就叫做`字节码`（即扩展名为 `.class` 的文件），它不面向任何特定的处理器，只面向虚拟机。Java 语言通过字节码的方式，在一定程度上解决了传统解释型语言执行效率低的问题，同时又保留了解释型语言可移植的特点。所以 Java 程序运行时比较高效，而且，由于字节码并不针对一种特定的机器，因此，Java 程序无须重新编译便可在多种不同操作系统的计算机上运行。
 
 
 
-### JDK
+**Java 程序从源代码到运行一般有下面 3 步：**
+
+![Java程序运行过程](https://my-blog-to-use.oss-cn-beijing.aliyuncs.com/Java%20%E7%A8%8B%E5%BA%8F%E8%BF%90%E8%A1%8C%E8%BF%87%E7%A8%8B.png)
+
+我们需要格外注意的是 .class->机器码 这一步。在这一步 JVM 类加载器首先加载字节码文件，然后通过解释器逐行解释执行，这种方式的执行速度会相对比较慢。而且，有些方法和代码块是经常需要被调用的(也就是所谓的热点代码)，所以后面引进了 JIT 编译器，而 JIT 属于运行时编译。当 JIT 编译器完成第一次编译后，其会将字节码对应的机器码保存下来，下次可以直接使用。而我们知道，机器码的运行效率肯定是高于 Java 解释器的。这也解释了我们为什么经常会说 Java 是编译与解释共存的语言。
+
+
+
+> HotSpot 采用了惰性评估(Lazy Evaluation)的做法，根据二八定律，消耗大部分系统资源的只有那一小部分的代码（热点代码），而这也就是 JIT 所需要编译的部分。JVM 会根据代码每次被执行的情况收集信息并相应地做出一些优化，因此执行的次数越多，它的速度就越快。JDK 9 引入了一种新的编译模式 AOT(Ahead of Time Compilation)，它是直接将字节码编译成机器码，这样就避免了 JIT 预热等各方面的开销。JDK 支持分层编译和 AOT 协作使用。但是 ，AOT 编译器的编译质量是肯定比不上 JIT 编译器的。
+
+
+
+**总结：**
+
+Java 虚拟机（JVM）是运行 Java 字节码的虚拟机。JVM 有针对不同系统的特定实现（Windows，Linux，macOS），目的是使用相同的字节码，它们都会给出相同的结果。字节码和不同系统的 JVM 实现是 Java 语言“一次编译，随处可以运行”的关键所在。
+
+
+
+#### JRE
+
+JRE（java runtime environment）是 java 运行时环境，包含了 JVM 和 java 核心基础类库（JDBC，lang and util）。但是，它不能用于创建新程序。
+
+
+
+#### JDK
 
 JDK（java development kit）是 java 开发运行环境，包含了 JRE，同时还包含了编译 java 源码的 javac （或称为前端编译器）和用于 java 程序调试分析的工具（JConsole，visualVM等）等。
 
