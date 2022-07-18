@@ -48,7 +48,7 @@
 - [ ] [] []()
 - [ ] [] []()
 - [ ] [] []()
-- [ ] [] []()
+- [ ] [2星A_2022_07_17] [MySQL 连接数过多的处理方法合集 - Too many connections](https://kalacloud.com/blog/mysql-error-too-many-connections/)
 - [X] [3星A_2022_07_16] [JavaGuide-通过源码一步一步分析 ArrayList 扩容机制](https://blog.csdn.net/m0_37302219/article/details/108956422)
 - [X] [1星A_2022_07_16] [看图轻松理解数据结构与算法系列(双向链表)](https://juejin.cn/post/6844903648154271757)
 - [X] [3星A_2022_07_16] [面试题总结-Java集合](https://snailclimb.gitee.io/javaguide-interview/#/./docs/b-2Java%E9%9B%86%E5%90%88)
