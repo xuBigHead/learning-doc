@@ -1,20 +1,18 @@
-# 目录
-
-[TOC]
-
-# 概述
+# SpringBoot
 
 Spring Boot是Spring开源组织下的子项目，是Spring组件一站式解决方案，主要是简化了使用Spring的难度，简省了繁重的配置，提供了各种启动器，开发者能快速上手。
 
-## SpringBoot特点
 
-## starter
 
-# 配置
+## 概述
 
-# 常用注解
+### SpringBoot特点
 
-## @ConditionalOnProperty
+
+
+## 常用注解
+
+### @ConditionalOnProperty
 
 ```java
 @Retention(RetentionPolicy.RUNTIME)
@@ -51,19 +49,14 @@ public Reporter<Span> spanReporter() {
 
 
 
-# 集成MyBatis
-
-# 集成MyBatis-Plus
-
-# 集成MongoDb
-
-# 集成Redis
-
-# 集成日志
-
-
-
 
 
 - [SpringBoot中 Jackson 日期的时区和日期格式问题](https://blog.csdn.net/jianxia801/article/details/89741073)
 
+
+
+# 组件整合
+
+## Mybatis
+
+## Mybatis-plus
