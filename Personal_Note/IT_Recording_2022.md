@@ -62,7 +62,7 @@
 - [ ] [] []()
 - [ ] [] []()
 - [ ] [] []()
-- [ ] [] []()
+- [X] [2星A_2022_07_20] [执行一条 select 语句，期间发生了什么？](https://xiaolincoding.com/mysql/base/how_select.html)
 - [X] [1星A_2022_07_20] [分布式事务（五）之最大努力通知](https://www.cnblogs.com/yuhushen/p/15530168.html)
 - [X] [1星A_2022_07_20] [分布式事务（四）之TCC](https://www.cnblogs.com/yuhushen/p/15520976.html)
 - [X] [1星A_2022_07_20] [分布式事务（二）之三阶段提交 ](https://www.cnblogs.com/yuhushen/p/15499367.html)
