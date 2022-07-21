@@ -201,6 +201,1195 @@ ACID是传统数据库常用的设计理念，追求强一致性模型，例如�
 
 # 分布式锁
 
+在一个分布式系统中，由于涉及到多个实例同时对同一个资源加锁的问题，像传统的synchronized、ReentrantLock等单进程情况加锁的api就不再适用，需要使用分布式锁来保证多服务实例之间加锁的安全性。常见的分布式锁的实现方式有zookeeper和redis等。而由于redis分布式锁相对于比较简单，在实际的项目中，redis分布式锁被用于很多实际的业务场景中。
+
+
+
+## 概述
+
+### 基础规范
+
+#### 保证加锁的原子性
+
+
+
+#### 锁的过期时间
+
+设置锁的过期时间主要原因是为了防止死锁。当某个客户端获取到锁，还没来得及主动释放锁，那么此时假如客户端宕机了，又或者是释放锁失败了，那么如果没有设置过期时间，那么这个锁key会一直在，那么其它线程来加锁的时候会发现key已经被加锁了，那么其它线程一直会加锁失败，就会产生死锁的问题。
+
+
+
+#### 手动释放锁
+
+当业务执行完成之后，肯定需要手动释放锁，那么为什么需要主动释放锁呢？
+
+第一，假设你任务执行完，没有手动释放锁，如果没有指定锁的超时时间，那么因为有看门狗机制，势必会导致这个锁无法释放，那么就可能造成**死锁**的问题。
+
+第二，如果你指定了锁超时时间，虽然并不会造成死锁的问题，但是会造成**资源浪费**的问题。假设你设置的过期时间是30s，但是你的任务2s就完成了，那么这个锁还会白白被占有28s的时间，这28s内其它线程都无法成功加锁。
+
+
+
+#### 超时自动释放
+
+通过设置超时时间，分布式锁在一定时间后会自动释放锁。
+
+指定超时时间达到超时释放锁的功能主要还是通过redis自动过期来实现，因为指定了超时时间，加锁成功之后就不会开启watchdog机制来延长加锁的时间。
+
+在实际项目中，指不指定锁的超时时间是根据具体的业务来的，如果你能够比较准确的预估出代码执行的时间，那么可以指定锁超时释放时间来防止业务执行错误导致无法释放锁的问题，如果不能预估出代码执行的时间，那么可以不指定超时时间。
+
+
+
+### 存在风险
+
+对于单Redis实例来说，如果Redis宕机了，那么整个系统就无法工作了。所以为了保证Redis的高可用性，一般会使用主从或者哨兵模式。但是如果使用了主从或者哨兵模式，此时Redis的分布式锁的功能可能就会出现问题。
+
+
+
+## Redisson分布式锁
+
+说到redis的分布式锁，可能第一时间就想到了setNx命令，这个命令保证一个key同时只能有一个线程设置成功，这样就能实现加锁的互斥性。但是Redisson并没有通过setNx命令来实现加锁，而是自己实现了一套完成的加锁的逻辑。
+
+
+
+### 非公平锁
+
+#### 实现流程
+
+
+
+#### 实现原理
+
+##### 看门狗机制
+
+Redisson对于这种未指定超时时间的加锁，就实现了一个叫watchdog机制，也就是看门狗机制来自动延长加锁的时间。
+
+在客户端通过tryLockInnerAsync方法加锁成功之后，如果你没有指定锁过期的时间，那么客户端会起一个定时任务，来定时延长加锁时间，默认每10s执行一次。所以watchdog的本质其实就是一个定时任务。
+
+因为有了看门狗机制，所以说如果没有设置过期时间并且没有主动去释放锁，那么这个锁就永远不会被释放，因为定时任务会不断的去延长锁的过期时间，造成死锁的问题。但是如果发生宕机了，是不会造成死锁的，因为宕机了，服务都没了，那么看门狗的这个定时任务就没了，也自然不会去续约，等锁自动过期了也就自动释放锁了，跟上述说的为什么需要设置过期时间是一样的。
+
+
+
+##### 可重入锁
+
+可重入加锁的意思就是同一个客户端同一个线程也能多次对同一个锁进行加锁。也就是同时可以执行多次 lock方法，流程都是一样的，最后也会调用到lua脚本，所以可重入加锁的逻辑最后也是通过加锁的lua脚本来实现的。
+
+
+
+##### 不同线程加锁互斥
+
+上面我们分析了第一次加锁逻辑和可重入加锁的逻辑，因为lua脚本加锁的逻辑同时只有一个线程能够执行（redis是单线程的原因），所以一旦有线程加锁成功，那么另一个线程来加锁，前面两个if条件都不成立，最后通过调用redis的pttl命令返回锁的剩余的过期时间回去。
+
+这样，客户端就根据返回值来判断是否加锁成功，因为第一次加锁和可重入加锁的返回值都是nil，而加锁失败就返回了锁的剩余过期时间。
+
+所以加锁的lua脚本通过条件判断就实现了加锁的互斥操作，保证其它线程无法加锁成功。总的来说，加锁的lua脚本实现了第一次加锁、可重入加锁和加锁互斥的逻辑。
+
+
+
+##### 阻塞等待加锁
+
+通过执行死循环（自旋）地的方式来不停地通过tryAcquire方法来尝试加锁，直到加锁成功之后才会跳出死循环，如果一直没有成功加锁，那么就会一直旋转下去，所谓的阻塞，实际上就是自旋加锁的方式。
+
+但是这种阻塞可能会产生问题，因为如果其它线程释放锁失败，那么这个阻塞加锁的线程会一直阻塞加锁，这肯定会出问题的。
+
+
+
+##### 超时放弃加锁
+
+超时放弃加锁指的是在指定时间内不断尝试加锁，直到超出指定时间后放弃加锁。
+
+
+
+##### 超时自动释放
+
+通过传入leaseTime参数就可以指定锁超时的时间，达到指定时间后就会释放锁。
+
+无论指不指定超时时间，最终其实都会调用tryAcquireAsync方法，只不过当不指定超时时间时，leaseTime传入的是-1，也就是代表不指定超时时间，但是Redisson默认还是会设置30s的过期时间；当指定超时时间，那么leaseTime就是我们自己指定的时间，最终也是通过同一个加锁的lua脚本逻辑。
+
+指定和不指定超时时间的主要区别是，加锁成功之后的逻辑不一样，不指定超时时间时，会开启watchdog后台线程，不断的续约加锁时间，而指定超时时间，就不会去开启watchdog定时任务，这样就不会续约，加锁key到了过期时间就会自动删除，也就达到了释放锁的目的。
+
+
+
+#### 源码解析
+
+```java
+    public void updateByNoFairLock() {
+        RLock lock = redissonClient.getLock("noFairLockName");
+        try {
+            lock.lock();
+            // business function
+        } finally {
+            lock.unlock();
+        }
+    }
+```
+
+
+
+##### 获取锁
+
+> org.redisson.Redisson
+
+```java
+   /**
+     * 根据name返回Lock实例
+     * 实现了非公平锁，因此不保证依据线程的顺序
+     */
+    @Override
+    public RLock getLock(String name) {
+        return new RedissonLock(connectionManager.getCommandExecutor(), name);
+    }
+```
+
+
+
+##### 添加锁
+
+###### 阻塞式加锁
+
+> org.redisson.RedissonLock
+
+```java
+    @Override
+    public void lock() {
+        try {
+            lock(-1, null, false);
+        } catch (InterruptedException e) {
+            throw new IllegalStateException();
+        }
+    }
+
+    @Override
+    public void lock(long leaseTime, TimeUnit unit) {
+        try {
+          	// 通过指定 leaseTime 表示超过该时间自动释放锁
+            lock(leaseTime, unit, false);
+        } catch (InterruptedException e) {
+            throw new IllegalStateException();
+        }
+    }
+
+    private void lock(long leaseTime, TimeUnit unit, boolean interruptibly) throws InterruptedException {
+        long threadId = Thread.currentThread().getId();
+        Long ttl = tryAcquire(leaseTime, unit, threadId);
+        // lock acquired
+        if (ttl == null) {
+            return;
+        }
+
+        RFuture<RedissonLockEntry> future = subscribe(threadId);
+        commandExecutor.syncSubscription(future);
+
+        try {
+            while (true) {
+                // 自旋阻塞方式不停尝试加锁
+                ttl = tryAcquire(leaseTime, unit, threadId);
+                // lock acquired
+                if (ttl == null) {
+                    break;
+                }
+
+                // waiting for message
+                if (ttl >= 0) {
+                    try {
+                        getEntry(threadId).getLatch().tryAcquire(ttl, TimeUnit.MILLISECONDS);
+                    } catch (InterruptedException e) {
+                        if (interruptibly) {
+                            throw e;
+                        }
+                        getEntry(threadId).getLatch().tryAcquire(ttl, TimeUnit.MILLISECONDS);
+                    }
+                } else {
+                    if (interruptibly) {
+                        getEntry(threadId).getLatch().acquire();
+                    } else {
+                        getEntry(threadId).getLatch().acquireUninterruptibly();
+                    }
+                }
+            }
+        } finally {
+            unsubscribe(future, threadId);
+        }
+//        get(lockAsync(leaseTime, unit));
+    }
+
+    /*
+     * 异步转同步的过程
+     */
+    private Long tryAcquire(long leaseTime, TimeUnit unit, long threadId) {
+        return get(tryAcquireAsync(leaseTime, unit, threadId));
+    }
+
+    protected final <V> V get(RFuture<V> future) {
+        return commandExecutor.get(future);
+    }
+
+    /*
+     * 异步加锁
+     */
+    private <T> RFuture<Long> tryAcquireAsync(long leaseTime, TimeUnit unit, long threadId) {
+        if (leaseTime != -1) {
+            // 不设置过期时间
+            return tryLockInnerAsync(leaseTime, unit, threadId, RedisCommands.EVAL_LONG);
+        }
+        RFuture<Long> ttlRemainingFuture = tryLockInnerAsync(commandExecutor.getConnectionManager().getCfg().getLockWatchdogTimeout(), TimeUnit.MILLISECONDS, threadId, RedisCommands.EVAL_LONG);
+        ttlRemainingFuture.onComplete((ttlRemaining, e) -> {
+            if (e != null) {
+                return;
+            }
+
+            // lock acquired
+            if (ttlRemaining == null) {
+                // 看门狗机制，只有不设置过期时间才会启动看门狗进行自动延期
+                scheduleExpirationRenewal(threadId);
+            }
+        });
+        return ttlRemainingFuture;
+    }
+```
+
+
+
+###### 超时放弃式加锁
+
+```java
+    @Override
+    public boolean tryLock(long waitTime, TimeUnit unit) throws InterruptedException {
+        return tryLock(waitTime, -1, unit);
+    }
+
+    @Override
+    public boolean tryLock(long waitTime, long leaseTime, TimeUnit unit) throws InterruptedException {
+        long time = unit.toMillis(waitTime);
+        long current = System.currentTimeMillis();
+        long threadId = Thread.currentThread().getId();
+        Long ttl = tryAcquire(leaseTime, unit, threadId);
+        // lock acquired
+        if (ttl == null) {
+            return true;
+        }
+        
+        // 判断是否超时
+        time -= System.currentTimeMillis() - current;
+        if (time <= 0) {
+            acquireFailed(threadId);
+            return false;
+        }
+        
+        current = System.currentTimeMillis();
+        RFuture<RedissonLockEntry> subscribeFuture = subscribe(threadId);
+        if (!subscribeFuture.await(time, TimeUnit.MILLISECONDS)) {
+            if (!subscribeFuture.cancel(false)) {
+                subscribeFuture.onComplete((res, e) -> {
+                    if (e == null) {
+                        unsubscribe(subscribeFuture, threadId);
+                    }
+                });
+            }
+            acquireFailed(threadId);
+            return false;
+        }
+
+        try {
+            // 自旋加锁前判断是否超时，超时则不再尝试加锁
+            time -= System.currentTimeMillis() - current;
+            if (time <= 0) {
+                acquireFailed(threadId);
+                return false;
+            }
+        
+            while (true) {
+                long currentTime = System.currentTimeMillis();
+                ttl = tryAcquire(leaseTime, unit, threadId);
+                // lock acquired
+                if (ttl == null) {
+                    return true;
+                }
+
+                // 判断是否超时，超时了就放弃加锁，推出循环
+                time -= System.currentTimeMillis() - currentTime;
+                if (time <= 0) {
+                    acquireFailed(threadId);
+                    return false;
+                }
+
+                // waiting for message
+                currentTime = System.currentTimeMillis();
+                if (ttl >= 0 && ttl < time) {
+                    getEntry(threadId).getLatch().tryAcquire(ttl, TimeUnit.MILLISECONDS);
+                } else {
+                    getEntry(threadId).getLatch().tryAcquire(time, TimeUnit.MILLISECONDS);
+                }
+
+                // 判断是否超时，超时了就放弃加锁，推出循环
+                time -= System.currentTimeMillis() - currentTime;
+                if (time <= 0) {
+                    acquireFailed(threadId);
+                    return false;
+                }
+            }
+        } finally {
+            unsubscribe(subscribeFuture, threadId);
+        }
+//        return get(tryLockAsync(waitTime, leaseTime, unit));
+    }
+```
+
+
+
+###### 看门狗机制
+
+> org.redisson.RedissonLock
+
+```java
+    private void scheduleExpirationRenewal(long threadId) {
+        ExpirationEntry entry = new ExpirationEntry();
+        ExpirationEntry oldEntry = EXPIRATION_RENEWAL_MAP.putIfAbsent(getEntryName(), entry);
+        if (oldEntry != null) {
+            oldEntry.addThreadId(threadId);
+        } else {
+            entry.addThreadId(threadId);
+            renewExpiration();
+        }
+    }
+
+    private void renewExpiration() {
+        ExpirationEntry ee = EXPIRATION_RENEWAL_MAP.get(getEntryName());
+        if (ee == null) {
+            return;
+        }
+        
+        Timeout task = commandExecutor.getConnectionManager().newTimeout(new TimerTask() {
+            @Override
+            public void run(Timeout timeout) throws Exception {
+                ExpirationEntry ent = EXPIRATION_RENEWAL_MAP.get(getEntryName());
+                if (ent == null) {
+                    return;
+                }
+                Long threadId = ent.getFirstThreadId();
+                if (threadId == null) {
+                    return;
+                }
+                // 定期执行如下方法，使用lua脚本来实现加锁时间的延长
+                RFuture<Boolean> future = renewExpirationAsync(threadId);
+                future.onComplete((res, e) -> {
+                    if (e != null) {
+                        log.error("Can't update lock " + getName() + " expiration", e);
+                        return;
+                    }
+                    
+                    if (res) {
+                        // 递归执行自身
+                        renewExpiration();
+                    }
+                });
+            }
+        }, internalLockLeaseTime / 3, TimeUnit.MILLISECONDS);
+        
+        ee.setTimeout(task);
+    }
+```
+
+
+
+internalLockLeaseTime 默认值是 30 * 1000，所以看门狗机制是默认每10秒执行一次。
+
+
+
+> org.redisson.RedissonLock
+
+```java
+    protected RFuture<Boolean> renewExpirationAsync(long threadId) {
+        return commandExecutor.evalWriteAsync(getName(), LongCodec.INSTANCE, RedisCommands.EVAL_BOOLEAN,
+                "if (redis.call('hexists', KEYS[1], ARGV[2]) == 1) then " +
+                    "redis.call('pexpire', KEYS[1], ARGV[1]); " +
+                    "return 1; " +
+                "end; " +
+                "return 0;",
+            Collections.<Object>singletonList(getName()), 
+            internalLockLeaseTime, getLockName(threadId));
+    }
+```
+
+
+
+这段lua脚本中参数的意思其实是跟加锁的参数的意思是一样的：
+
+- KEYS[1]：就是锁的名称
+- ARGV[1]：就是锁的过期时间
+- ARGV[2]：代表了加锁的唯一标识，b983c153-7421-469a-addb-44fb92259a1b:1。
+
+这段lua脚本的意思就是判断来续约的线程跟加锁的线程是同一个，如果是同一个，那么将锁的过期时间延长到30s，然后返回1，代表续约成功，不是的话就返回0，代表续约失败，下一次定时任务也就不会执行了。
+
+
+
+###### LUA脚本加锁
+
+> org.redisson.RedissonLock
+
+```java
+    <T> RFuture<T> tryLockInnerAsync(long leaseTime, TimeUnit unit, long threadId, RedisStrictCommand<T> command) {
+        internalLockLeaseTime = unit.toMillis(leaseTime);
+
+        return commandExecutor.evalWriteAsync(getName(), LongCodec.INSTANCE, command,
+                  "if (redis.call('exists', KEYS[1]) == 0) then " +
+                      "redis.call('hset', KEYS[1], ARGV[2], 1); " +
+                      "redis.call('pexpire', KEYS[1], ARGV[1]); " +
+                      "return nil; " +
+                  "end; " +
+                  "if (redis.call('hexists', KEYS[1], ARGV[2]) == 1) then " +
+                      "redis.call('hincrby', KEYS[1], ARGV[2], 1); " +
+                      "redis.call('pexpire', KEYS[1], ARGV[1]); " +
+                      "return nil; " +
+                  "end; " +
+                  "return redis.call('pttl', KEYS[1]);",
+                    Collections.<Object>singletonList(getName()), internalLockLeaseTime, getLockName(threadId));
+    }
+```
+
+
+
+其中这段脚本中的lua脚本中的参数的意思：
+
+- KEYS[1]：就是锁的名称
+- ARGV[1]：就是锁的过期时间，不指定的话默认是30s
+- ARGV[2]：代表了加锁的唯一标识，由UUID和线程id组成。一个Redisson客户端一个UUID，UUID代表了一个唯一的客户端。所以由UUID和线程id组成了加锁的唯一标识，可以理解为某个客户端的某个线程加锁。
+
+
+
+LUA的加锁的逻辑。
+
+1）先调用redis的exists命令判断加锁的key存不存在，如果不存在的话，那么就进入if。不存在的意思就是还没有某个客户端的某个线程来加锁，第一次加锁肯定没有人来加锁，于是第一次if条件成立。
+
+
+
+2）然后调用redis的hincrby的命令，设置加锁的key和加锁的某个客户端的某个线程，加锁次数设置为1，加锁次数很关键，是实现可重入锁特性的一个关键数据。用hash数据结构保存。hincrby命令完成后就形成如下的数据结构。
+
+```c
+lockname:{
+    "b983c153-7421-469a-addb-44fb92259a1b:1":1
+}
+```
+
+
+
+3）最后调用redis的pexpire的命令，将加锁的key过期时间设置为30s。
+
+从这里可以看出，第一次有某个客户端的某个线程来加锁的逻辑还是挺简单的，就是判断有没有人加过锁，没有的话就自己去加锁，设置加锁的key，再存一下加锁的线程和加锁次数，设置一下锁的过期时间为30s。
+
+
+
+**可重入锁**
+
+> org.redisson.RedissonLock
+
+```java
+ <T> RFuture<T> tryLockInnerAsync(long leaseTime, TimeUnit unit, long threadId, RedisStrictCommand<T> command) {
+        // ...
+                  // 判断当前已经加锁的key对应的加锁线程跟要来加锁的线程是不是同一个，
+                  // 如果是的话，就将这个线程对应的加锁次数加1，
+                  // 也就实现了可重入加锁，同时返回nil回去。
+                  "if (redis.call('hexists', KEYS[1], ARGV[2]) == 1) then " +
+                      "redis.call('hincrby', KEYS[1], ARGV[2], 1); " +
+                      "redis.call('pexpire', KEYS[1], ARGV[1]); " +
+                      "return nil; " +
+                  "end; " +
+                  "return redis.call('pttl', KEYS[1]);",
+         // ...
+    }
+```
+
+
+
+可重入加锁成功之后，加锁key和对应的值可能是这样。
+
+```c
+lockname:{
+    "b983c153-7421-469a-addb-44fb92259a1b:1":1
+}
+```
+
+
+
+##### 释放锁
+
+> org.redisson.RedissonLock
+
+```java
+    @Override
+    public void unlock() {
+        try {
+            get(unlockAsync(Thread.currentThread().getId()));
+        } catch (RedisException e) {
+            if (e.getCause() instanceof IllegalMonitorStateException) {
+                throw (IllegalMonitorStateException) e.getCause();
+            } else {
+                throw e;
+            }
+        }
+    }
+
+    @Override
+    public RFuture<Void> unlockAsync(long threadId) {
+        RPromise<Void> result = new RedissonPromise<Void>();
+        // 调用LUA脚本释放锁
+        RFuture<Boolean> future = unlockInnerAsync(threadId);
+
+        future.onComplete((opStatus, e) -> {
+            if (e != null) {
+                cancelExpirationRenewal(threadId);
+                result.tryFailure(e);
+                return;
+            }
+
+            if (opStatus == null) {
+                IllegalMonitorStateException cause = new IllegalMonitorStateException("attempt to unlock lock, not locked by current thread by node id: "
+                        + id + " thread-id: " + threadId);
+                result.tryFailure(cause);
+                return;
+            }
+            
+            cancelExpirationRenewal(threadId);
+            result.trySuccess(null);
+        });
+
+        return result;
+    }
+```
+
+
+
+###### LUA脚本释放锁
+
+> org.redisson.RedissonLock
+
+```java
+    protected RFuture<Boolean> unlockInnerAsync(long threadId) {
+        return commandExecutor.evalWriteAsync(getName(), LongCodec.INSTANCE, RedisCommands.EVAL_BOOLEAN,
+                "if (redis.call('hexists', KEYS[1], ARGV[3]) == 0) then " +
+                    "return nil;" +
+                "end; " +
+                "local counter = redis.call('hincrby', KEYS[1], ARGV[3], -1); " +
+                "if (counter > 0) then " +
+                    "redis.call('pexpire', KEYS[1], ARGV[2]); " +
+                    "return 0; " +
+                "else " +
+                    "redis.call('del', KEYS[1]); " +
+                    "redis.call('publish', KEYS[2], ARGV[1]); " +
+                    "return 1; "+
+                "end; " +
+                "return nil;",
+                Arrays.<Object>asList(getName(), getChannelName()), LockPubSub.UNLOCK_MESSAGE, internalLockLeaseTime, getLockName(threadId));
+
+    }
+```
+
+
+
+lua脚本逻辑如下：
+
+1）先判断来释放锁的线程是不是加锁的线程，如果不是，那么直接返回nil，所以从这里可以看出，主要是通过一个if条件来防止线程释放了其它线程加的锁。
+
+2）如果来释放锁的线程是加锁的线程，那么就将加锁次数减1，然后拿到剩余的加锁次数 counter 变量。
+
+3）如果counter大于0，说明有重入加锁，锁还没有彻底的释放完，那么就设置一下锁的过期时间，然后返回0
+
+4）如果counter没大于0，说明当前这个锁已经彻底释放完了，于是就把锁对应的key给删除，然后发布一个锁已经释放的消息，然后返回1。
+
+
+
+### 公平锁
+
+所谓的公平锁就是指线程成功加锁的顺序跟线程来加锁的顺序是一样，实现了先来先成功加锁的特性，所以叫公平锁。就跟排队一样，不插队才叫公平。
+
+
+
+#### 实现原理
+
+通过RedissonClient的getFairLock就可以获取到公平锁。Redisson对于公平锁的实现是RedissonFairLock类，通过RedissonFairLock来加锁，就能实现公平锁的特性。
+
+
+
+##### 公平锁和非公平锁的比较
+
+公平锁的优点是按序平均分配锁资源，不会出现线程饿死的情况，它的缺点是按序唤醒线程的开销大，执行性能不高。非公平锁的优点是执行效率高，谁先获取到锁，锁就属于谁，不会“按资排辈”以及顺序唤醒，但缺点是资源分配随机性强，可能会出现线程饿死的情况。
+
+
+
+#### 源码解析
+
+```java
+    public void updateByFairLock() {
+        RLock fairLock = redissonClient.getFairLock("fairLockName");
+        try {
+            fairLock.lock();
+            // business function
+        } finally {
+            fairLock.unlock();
+        }
+    }
+```
+
+
+
+##### 获取锁
+
+> org.redisson.Redisson
+
+```java
+    @Override
+    public RLock getFairLock(String name) {
+        return new RedissonFairLock(connectionManager.getCommandExecutor(), name);
+    }
+```
+
+
+
+##### 添加锁
+
+RedissonFairLock继承了RedissonLock，主要是重写了tryLockInnerAsync方法，也就是加锁逻辑的方法。
+
+> org.redisson.RedissonFairLock
+
+```java
+    @Override
+    <T> RFuture<T> tryLockInnerAsync(long leaseTime, TimeUnit unit, long threadId, RedisStrictCommand<T> command) {
+        internalLockLeaseTime = unit.toMillis(leaseTime);
+
+        long currentTime = System.currentTimeMillis();
+        if (command == RedisCommands.EVAL_NULL_BOOLEAN) {
+            return commandExecutor.evalWriteAsync(getName(), LongCodec.INSTANCE, command,
+                    // remove stale threads
+                    "while true do " +
+                        "local firstThreadId2 = redis.call('lindex', KEYS[2], 0);" +
+                        "if firstThreadId2 == false then " +
+                            "break;" +
+                        "end;" +
+                        "local timeout = tonumber(redis.call('zscore', KEYS[3], firstThreadId2));" +
+                        "if timeout <= tonumber(ARGV[3]) then " +
+                            // remove the item from the queue and timeout set
+                            // NOTE we do not alter any other timeout
+                            "redis.call('zrem', KEYS[3], firstThreadId2);" +
+                            "redis.call('lpop', KEYS[2]);" +
+                        "else " +
+                            "break;" +
+                        "end;" +
+                    "end;" +
+
+                    "if (redis.call('exists', KEYS[1]) == 0) " +
+                        "and ((redis.call('exists', KEYS[2]) == 0) " +
+                            "or (redis.call('lindex', KEYS[2], 0) == ARGV[2])) then " +
+                        "redis.call('lpop', KEYS[2]);" +
+                        "redis.call('zrem', KEYS[3], ARGV[2]);" +
+
+                        // decrease timeouts for all waiting in the queue
+                        "local keys = redis.call('zrange', KEYS[3], 0, -1);" +
+                        "for i = 1, #keys, 1 do " +
+                            "redis.call('zincrby', KEYS[3], -tonumber(ARGV[4]), keys[i]);" +
+                        "end;" +
+
+                        "redis.call('hset', KEYS[1], ARGV[2], 1);" +
+                        "redis.call('pexpire', KEYS[1], ARGV[1]);" +
+                        "return nil;" +
+                    "end;" +
+                    "if (redis.call('hexists', KEYS[1], ARGV[2]) == 1) then " +
+                        "redis.call('hincrby', KEYS[1], ARGV[2], 1);" +
+                        "redis.call('pexpire', KEYS[1], ARGV[1]);" +
+                        "return nil;" +
+                    "end;" +
+                    "return 1;",
+                    Arrays.<Object>asList(getName(), threadsQueueName, timeoutSetName),
+                    internalLockLeaseTime, getLockName(threadId), currentTime, threadWaitTime);
+        }
+
+        if (command == RedisCommands.EVAL_LONG) {
+            return commandExecutor.evalWriteAsync(getName(), LongCodec.INSTANCE, command,
+                    // remove stale threads
+                    "while true do " +
+                        "local firstThreadId2 = redis.call('lindex', KEYS[2], 0);" +
+                        "if firstThreadId2 == false then " +
+                            "break;" +
+                        "end;" +
+
+                        "local timeout = tonumber(redis.call('zscore', KEYS[3], firstThreadId2));" +
+                        "if timeout <= tonumber(ARGV[4]) then " +
+                            // remove the item from the queue and timeout set
+                            // NOTE we do not alter any other timeout
+                            "redis.call('zrem', KEYS[3], firstThreadId2);" +
+                            "redis.call('lpop', KEYS[2]);" +
+                        "else " +
+                            "break;" +
+                        "end;" +
+                    "end;" +
+
+                    // check if the lock can be acquired now
+                    "if (redis.call('exists', KEYS[1]) == 0) " +
+                        "and ((redis.call('exists', KEYS[2]) == 0) " +
+                            "or (redis.call('lindex', KEYS[2], 0) == ARGV[2])) then " +
+
+                        // remove this thread from the queue and timeout set
+                        "redis.call('lpop', KEYS[2]);" +
+                        "redis.call('zrem', KEYS[3], ARGV[2]);" +
+
+                        // decrease timeouts for all waiting in the queue
+                        "local keys = redis.call('zrange', KEYS[3], 0, -1);" +
+                        "for i = 1, #keys, 1 do " +
+                            "redis.call('zincrby', KEYS[3], -tonumber(ARGV[3]), keys[i]);" +
+                        "end;" +
+
+                        // acquire the lock and set the TTL for the lease
+                        "redis.call('hset', KEYS[1], ARGV[2], 1);" +
+                        "redis.call('pexpire', KEYS[1], ARGV[1]);" +
+                        "return nil;" +
+                    "end;" +
+
+                    // check if the lock is already held, and this is a re-entry
+                    "if redis.call('hexists', KEYS[1], ARGV[2]) == 1 then " +
+                        "redis.call('hincrby', KEYS[1], ARGV[2],1);" +
+                        "redis.call('pexpire', KEYS[1], ARGV[1]);" +
+                        "return nil;" +
+                    "end;" +
+
+                    // the lock cannot be acquired
+                    // check if the thread is already in the queue
+                    "local timeout = redis.call('zscore', KEYS[3], ARGV[2]);" +
+                    "if timeout ~= false then " +
+                        // the real timeout is the timeout of the prior thread
+                        // in the queue, but this is approximately correct, and
+                        // avoids having to traverse the queue
+                        "return timeout - tonumber(ARGV[3]) - tonumber(ARGV[4]);" +
+                    "end;" +
+
+                    // add the thread to the queue at the end, and set its timeout in the timeout set to the timeout of
+                    // the prior thread in the queue (or the timeout of the lock if the queue is empty) plus the
+                    // threadWaitTime
+                    "local lastThreadId = redis.call('lindex', KEYS[2], -1);" +
+                    "local ttl;" +
+                    "if lastThreadId ~= false and lastThreadId ~= ARGV[2] then " +
+                        "ttl = tonumber(redis.call('zscore', KEYS[3], lastThreadId)) - tonumber(ARGV[4]);" +
+                    "else " +
+                        "ttl = redis.call('pttl', KEYS[1]);" +
+                    "end;" +
+                    "local timeout = ttl + tonumber(ARGV[3]) + tonumber(ARGV[4]);" +
+                    "if redis.call('zadd', KEYS[3], timeout, ARGV[2]) == 1 then " +
+                        "redis.call('rpush', KEYS[2], ARGV[2]);" +
+                    "end;" +
+                    "return ttl;",
+                    Arrays.<Object>asList(getName(), threadsQueueName, timeoutSetName),
+                    internalLockLeaseTime, getLockName(threadId), threadWaitTime, currentTime);
+        }
+
+        throw new IllegalArgumentException();
+    }
+```
+
+
+
+当线程来加锁的时候，如果加锁失败了，那么会将线程扔到一个set集合中，这样就按照加锁的顺序给线程排队，set集合的头部的线程就代表了接下来能够加锁成功的线程。当有线程释放了锁之后，其它加锁失败的线程就会来继续加锁，加锁之前会先判断一下set集合的头部的线程跟当前要加锁的线程是不是同一个，如果是的话，那就加锁成功，如果不是的话，那么就加锁失败，这样就实现了加锁的顺序性。
+
+
+
+### 读写锁
+
+在实际的业务场景中，其实会有很多读多写少的场景，那么对于这种场景来说，使用独占锁来加锁，在高并发场景下会导致大量的线程加锁失败，阻塞，对系统的吞吐量有一定的影响，为了适配这种读多写少的场景，Redisson也实现了读写锁的功能。
+
+读写锁的特点：
+
+- 读与读是共享的，不互斥
+- 读与写互斥
+- 写与写互斥
+
+
+
+#### 实现原理
+
+Redisson通过RedissonReadWriteLock类来实现读写锁的功能，通过这个类可以获取到读锁或者写锁，所以真正的加锁的逻辑是由读锁和写锁实现的。
+
+前面说过，加锁成功之后会在redis中维护一个hash的数据结构，存储加锁线程和加锁次数。在读写锁的实现中，会往hash数据结构中多维护一个mode的字段，来表示当前加锁的模式。
+
+所以能够实现读写锁，最主要是因为维护了一个加锁模式的字段mode，这样有线程来加锁的时候，就能根据当前加锁的模式结合读写的特性来判断要不要让当前来加锁的线程加锁成功。
+
+- 如果没有加锁，那么不论是读锁还是写锁都能加成功，成功之后根据锁的类型维护mode字段。
+- 如果模式是读锁，那么加锁线程是来加读锁的，就让它加锁成功。
+- 如果模式是读锁，那么加锁线程是来加写锁的，就让它加锁失败。
+- 如果模式是写锁，那么加锁线程是来加写锁的，就让它加锁失败（加锁线程自己除外）。
+- 如果模式是写锁，那么加锁线程是来加读锁的，就让它加锁失败（加锁线程自己除外）。
+
+
+
+#### 源码解析
+
+```java
+		public void updateByReadLock() {
+        RReadWriteLock readWriteLock = redissonClient.getReadWriteLock("readWriteLock");
+        RLock readLock = readWriteLock.readLock();
+        try {
+            readLock.lock();
+            // business function
+        } finally {
+            readLock.unlock();
+        }
+    }
+
+    public void updateByWriteLock() {
+        RReadWriteLock readWriteLock = redissonClient.getReadWriteLock("readWriteLock");
+        RLock writeLock = readWriteLock.writeLock();
+        try {
+            writeLock.lock();
+            // business function
+        } finally {
+            writeLock.unlock();
+        }
+    }
+```
+
+
+
+##### 获取锁
+
+> org.redisson.Redisson
+
+```java
+    @Override
+    public RReadWriteLock getReadWriteLock(String name) {
+        return new RedissonReadWriteLock(connectionManager.getCommandExecutor(), name);
+    }
+```
+
+
+
+> org.redisson.RedissonReadWriteLock
+
+```java
+    @Override
+    public RLock readLock() {
+        return new RedissonReadLock(commandExecutor, getName());
+    }
+
+    @Override
+    public RLock writeLock() {
+        return new RedissonWriteLock(commandExecutor, getName());
+    }
+```
+
+
+
+##### 添加读锁
+
+> org.redisson.RedissonReadLock
+
+```java
+    @Override
+    <T> RFuture<T> tryLockInnerAsync(long leaseTime, TimeUnit unit, long threadId, RedisStrictCommand<T> command) {
+        internalLockLeaseTime = unit.toMillis(leaseTime);
+
+        return commandExecutor.evalWriteAsync(getName(), LongCodec.INSTANCE, command,
+                                "local mode = redis.call('hget', KEYS[1], 'mode'); " +
+                                "if (mode == false) then " +
+                                  "redis.call('hset', KEYS[1], 'mode', 'read'); " +
+                                  "redis.call('hset', KEYS[1], ARGV[2], 1); " +
+                                  "redis.call('set', KEYS[2] .. ':1', 1); " +
+                                  "redis.call('pexpire', KEYS[2] .. ':1', ARGV[1]); " +
+                                  "redis.call('pexpire', KEYS[1], ARGV[1]); " +
+                                  "return nil; " +
+                                "end; " +
+                                "if (mode == 'read') or (mode == 'write' and redis.call('hexists', KEYS[1], ARGV[3]) == 1) then " +
+                                  "local ind = redis.call('hincrby', KEYS[1], ARGV[2], 1); " + 
+                                  "local key = KEYS[2] .. ':' .. ind;" +
+                                  "redis.call('set', key, 1); " +
+                                  "redis.call('pexpire', key, ARGV[1]); " +
+                                  "local remainTime = redis.call('pttl', KEYS[1]); " +
+                                  "redis.call('pexpire', KEYS[1], math.max(remainTime, ARGV[1])); " +
+                                  "return nil; " +
+                                "end;" +
+                                "return redis.call('pttl', KEYS[1]);",
+                        Arrays.<Object>asList(getName(), getReadWriteTimeoutNamePrefix(threadId)), 
+                        internalLockLeaseTime, getLockName(threadId), getWriteLockName(threadId));
+    }
+```
+
+
+
+##### 释放读锁
+
+
+
+##### 添加写锁
+
+> org.redisson.RedissonWriteLock
+
+```java
+    @Override
+    <T> RFuture<T> tryLockInnerAsync(long leaseTime, TimeUnit unit, long threadId, RedisStrictCommand<T> command) {
+        internalLockLeaseTime = unit.toMillis(leaseTime);
+
+        return commandExecutor.evalWriteAsync(getName(), LongCodec.INSTANCE, command,
+                            "local mode = redis.call('hget', KEYS[1], 'mode'); " +
+                            "if (mode == false) then " +
+                                  "redis.call('hset', KEYS[1], 'mode', 'write'); " +
+                                  "redis.call('hset', KEYS[1], ARGV[2], 1); " +
+                                  "redis.call('pexpire', KEYS[1], ARGV[1]); " +
+                                  "return nil; " +
+                              "end; " +
+                              "if (mode == 'write') then " +
+                                  "if (redis.call('hexists', KEYS[1], ARGV[2]) == 1) then " +
+                                      "redis.call('hincrby', KEYS[1], ARGV[2], 1); " + 
+                                      "local currentExpire = redis.call('pttl', KEYS[1]); " +
+                                      "redis.call('pexpire', KEYS[1], currentExpire + ARGV[1]); " +
+                                      "return nil; " +
+                                  "end; " +
+                                "end;" +
+                                "return redis.call('pttl', KEYS[1]);",
+                        Arrays.<Object>asList(getName()), 
+                        internalLockLeaseTime, getLockName(threadId));
+    }
+```
+
+
+
+##### 释放写锁
+
+```java
+```
+
+
+
+### 批量加锁
+
+#### 实现原理
+
+批量加锁的意思就是同时加几个锁，只有这些锁都算加成功了，才是真正的加锁成功。
+
+
+
+#### 源码解析
+
+```java
+public void updateByMultiLock() {
+    RLock lock1 = redissonClient.getLock("lock1");
+    RLock lock2 = redissonClient.getLock("lock2");
+    RLock lock3 = redissonClient.getLock("lock3");
+    RLock multiLock = redissonClient.getMultiLock(lock1, lock2, lock3);
+    try {
+        multiLock.lock();
+        // business function
+    } finally {
+        multiLock.unlock();
+    }
+}
+```
+
+
+
+##### 获取锁
+
+> org.redisson.Redisson
+
+```java
+@Override
+public RLock getMultiLock(RLock... locks) {
+    return new RedissonMultiLock(locks);
+}
+```
+
+
+
+##### 添加锁
+
+> org.redisson.RedissonMultiLock
+
+```java
+@Override
+public void lock() {
+    try {
+        lockInterruptibly();
+    } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+    }
+}
+
+@Override
+public void lockInterruptibly() throws InterruptedException {
+    lockInterruptibly(-1, null);
+}
+
+@Override
+public void lockInterruptibly(long leaseTime, TimeUnit unit) throws InterruptedException {
+    long baseWaitTime = locks.size() * 1500;
+    long waitTime = -1;
+    if (leaseTime == -1) {
+        waitTime = baseWaitTime;
+    } else {
+        leaseTime = unit.toMillis(leaseTime);
+        waitTime = leaseTime;
+        if (waitTime <= 2000) {
+            waitTime = 2000;
+        } else if (waitTime <= baseWaitTime) {
+            waitTime = ThreadLocalRandom.current().nextLong(waitTime/2, waitTime);
+        } else {
+            waitTime = ThreadLocalRandom.current().nextLong(baseWaitTime, waitTime);
+        }
+    }
+    
+    while (true) {
+        if (tryLock(waitTime, leaseTime, TimeUnit.MILLISECONDS)) {
+            return;
+        }
+    }
+}
+
+@Override
+public boolean tryLock(long waitTime, long leaseTime, TimeUnit unit) throws InterruptedException {
+    long newLeaseTime = -1;
+    if (leaseTime != -1) {
+        if (waitTime == -1) {
+            newLeaseTime = unit.toMillis(leaseTime);
+        } else {
+            newLeaseTime = unit.toMillis(waitTime)*2;
+        }
+    }
+    
+    long time = System.currentTimeMillis();
+    long remainTime = -1;
+    if (waitTime != -1) {
+        remainTime = unit.toMillis(waitTime);
+    }
+    long lockWaitTime = calcLockWaitTime(remainTime);
+    
+    int failedLocksLimit = failedLocksLimit();
+    List<RLock> acquiredLocks = new ArrayList<>(locks.size());
+    // 根据顺序去依次调用传入myLock1、myLock2、myLock3 加锁方法，然后如果都成功加锁了，那么multiLock就算加锁成功。
+    for (ListIterator<RLock> iterator = locks.listIterator(); iterator.hasNext();) {
+        RLock lock = iterator.next();
+        boolean lockAcquired;
+        try {
+            if (waitTime == -1 && leaseTime == -1) {
+                // 加锁
+                lockAcquired = lock.tryLock();
+            } else {
+                long awaitTime = Math.min(lockWaitTime, remainTime);
+                // 加锁
+                lockAcquired = lock.tryLock(awaitTime, newLeaseTime, TimeUnit.MILLISECONDS);
+            }
+        } catch (RedisResponseTimeoutException e) {
+            unlockInner(Arrays.asList(lock));
+            lockAcquired = false;
+        } catch (Exception e) {
+            lockAcquired = false;
+        }
+        
+        if (lockAcquired) {
+            acquiredLocks.add(lock);
+        } else {
+            if (locks.size() - acquiredLocks.size() == failedLocksLimit()) {
+                break;
+            }
+
+            if (failedLocksLimit == 0) {
+                unlockInner(acquiredLocks);
+                if (waitTime == -1) {
+                    return false;
+                }
+                failedLocksLimit = failedLocksLimit();
+                acquiredLocks.clear();
+                // reset iterator
+                while (iterator.hasPrevious()) {
+                    iterator.previous();
+                }
+            } else {
+                failedLocksLimit--;
+            }
+        }
+        
+        if (remainTime != -1) {
+            remainTime -= System.currentTimeMillis() - time;
+            time = System.currentTimeMillis();
+            if (remainTime <= 0) {
+                unlockInner(acquiredLocks);
+                return false;
+            }
+        }
+    }
+
+    if (leaseTime != -1) {
+        List<RFuture<Boolean>> futures = new ArrayList<>(acquiredLocks.size());
+        for (RLock rLock : acquiredLocks) {
+            RFuture<Boolean> future = ((RedissonLock) rLock).expireAsync(unit.toMillis(leaseTime), TimeUnit.MILLISECONDS);
+            futures.add(future);
+        }
+        
+        for (RFuture<Boolean> rFuture : futures) {
+            rFuture.syncUninterruptibly();
+        }
+    }
+    
+    return true;
+}
+```
+
+
+
+### 红锁
+
+对于单Redis实例来说，如果Redis宕机了，那么整个系统就无法工作了。所以为了保证Redis的高可用性，一般会使用主从或者哨兵模式。但是如果使用了主从或者哨兵模式，此时Redis的分布式锁的功能可能就会出现问题。
+
+基于这种模式，Redis客户端会在master节点上加锁，然后异步复制给slave节点。但是因为一些原因，master节点宕机了，那么哨兵节点感知到了master节点宕机了，那么就会从slave节点选择一个节点作为主节点，实现主从切换。
+
+这种情况看似没什么问题，但是不幸的事发生了，那就是客户端对原先的主节点加锁，加成之后还没有来得及同步给从节点，主节点宕机了，从节点变成了主节点，此时从节点是没有加锁信息的，如果有其它的客户端来加锁，是能够加锁成功的，这不是很坑爹么。
+
+
+
+#### 实现原理
+
+在Redis的分布式环境中，我们假设有N个Redis master。这些节点完全互相独立，不存在主从复制或者其他集群协调机制。之前我们已经描述了在Redis单实例下怎么安全地获取和释放锁。我们确保将在每（N)个实例上使用此方法获取和释放锁。在这个样例中，我们假设有5个Redis master节点，这是一个比较合理的设置，所以我们需要在5台机器上面或者5台虚拟机上面运行这些实例，这样保证他们不会同时都宕掉。
+
+为了取到锁，客户端应该执行以下操作:
+
+1. 获取当前Unix时间，以毫秒为单位。
+2. 依次尝试从N个实例，使用相同的key和随机值获取锁。在步骤2，当向Redis设置锁时,客户端应该设置一个网络连接和响应超时时间，这个超时时间应该小于锁的失效时间。例如你的锁自动失效时间为10秒，则超时时间应该在5-50毫秒之间。这样可以避免服务器端Redis已经挂掉的情况下，客户端还在死死地等待响应结果。如果服务器端没有在规定时间内响应，客户端应该尽快尝试另外一个Redis实例。
+3. 客户端使用当前时间减去开始获取锁时间（步骤1记录的时间）就得到获取锁使用的时间。当且仅当从大多数（这里是3个节点）的Redis节点都取到锁，并且使用的时间小于锁失效时间时，锁才算获取成功。
+4. 如果取到了锁，key的真正有效时间等于有效时间减去获取锁所使用的时间（步骤3计算的结果）。
+5. 如果因为某些原因，获取锁失败（没有在至少N/2+1个Redis实例取到锁或者取锁时间已经超过了有效时间），客户端应该在所有的Redis实例上进行解锁（即便某些Redis实例根本就没有加锁成功）。
+
+
+
+RedissonRedLock加锁过程如下：
+
+- 获取所有的redisson node节点信息，循环向所有的redisson node节点加锁，假设节点数为N，例子中N等于5。一个redisson node代表一个主从节点。
+- 如果在N个节点当中，有N/2 + 1个节点加锁成功了，那么整个RedissonRedLock加锁是成功的。
+- 如果在N个节点当中，小于N/2 + 1个节点加锁成功，那么整个RedissonRedLock加锁是失败的。
+- 如果中途发现各个节点加锁的总耗时，大于等于设置的最大等待时间，则直接返回失败。
+
+RedissonRedLock底层其实也就基于RedissonMultiLock实现的，RedissonMultiLock要求所有的加锁成功才算成功，RedissonRedLock要求只要有N/2 + 1个成功就算成功。
+
+
+
+#### 源码解析
+
+```java
+    public void updateByRedLock() {
+        RLock lock1 = redissonClient.getLock("lock1");
+        RLock lock2 = redissonClient.getLock("lock2");
+        RLock lock3 = redissonClient.getLock("lock3");
+        RedissonRedLock redissonRedLock = new RedissonRedLock(lock1, lock2, lock3);
+        try {
+            redissonRedLock.lock();
+            // business function
+        } finally {
+            redissonRedLock.unlock();
+        }
+    }
+```
+
+
+
+### 参考资料
+
+- [Redission Github](https://github.com/redisson/redisson/wiki/%E7%9B%AE%E5%BD%95)
+
+
+
+## Zookeeper分布式锁
+
 
 
 # 分布式事务
