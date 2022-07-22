@@ -95,7 +95,7 @@
 - [ ] [] [Redis 6.0 新特性-多线程连环13问！](https://mp.weixin.qq.com/s/FZu3acwK6zrCBZQ_3HoUgw)
 - [X] [1星A_2022_07_19] [Spring中的@Transactional(rollbackFor = Exception.class)属性详解 ](https://www.cnblogs.com/clwydjgs/p/9317849.html)
 - [ ] [] [Spring学习(1)——快速入门](https://www.cnblogs.com/wmyskxz/p/8820371.html)
-- [ ] [] [面试官:“谈谈Spring中都用到了那些设计模式?”。](https://mp.weixin.qq.com/s?__biz=Mzg2OTA0Njk0OA==&mid=2247485303&idx=1&sn=9e4626a1e3f001f9b0d84a6fa0cff04a&chksm=cea248bcf9d5c1aaf48b67cc52bac74eb29d6037848d6cf213b0e5466f2d1fda970db700ba41&token=255050878&lang=zh_CN#rd)
+- [X] [2星A_2022_07_22] [面试官:“谈谈Spring中都用到了那些设计模式?”。](https://mp.weixin.qq.com/s?__biz=Mzg2OTA0Njk0OA==&mid=2247485303&idx=1&sn=9e4626a1e3f001f9b0d84a6fa0cff04a&chksm=cea248bcf9d5c1aaf48b67cc52bac74eb29d6037848d6cf213b0e5466f2d1fda970db700ba41&token=255050878&lang=zh_CN#rd)
 - [ ] [] [Difference between @RestController and @Controller Annotation in Spring MVC and REST](https://javarevisited.blogspot.com/2017/08/difference-between-restcontroller-and-controller-annotations-spring-mvc-rest.html?m=1)
 - [ ] [] [Spring IoC有什么好处呢？](https://www.zhihu.com/question/23277575/answer/169698662)
 - [ ] [] [Spring Bean的生命周期（非常详细）](https://www.cnblogs.com/zrtqsk/p/3735273.html)
